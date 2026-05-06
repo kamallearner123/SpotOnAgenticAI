@@ -10,7 +10,7 @@
 ## Task 1: Token Counter (30 points)
 
 Write a Python script that:
-1. Takes a string as input
+1. Takes a string as input 
 2. Counts its approximate token count (use the `tiktoken` library)
 3. Estimates the API cost (assume $0.15 per 1M tokens for gpt-4o-mini)
 

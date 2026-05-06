@@ -26,7 +26,7 @@ print(f"Tokens used: {response.usage.total_tokens}")
 
 ---
 
-## 🔗 Ollama (Local LLM)
+## 🔗 Ollama (Local LLM) 
 
 ```python
 from openai import OpenAI
