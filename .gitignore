@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+*.so
+*.dylib
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+
+# Environment Variables / Secrets
+.env
+.env.local
+.env.*.local
+*.env
+secrets.json
+secrets.yaml
+config.local.py
+
+# API Keys — NEVER commit these
+openai_key.txt
+api_keys.txt
+*.key
+
+# Node / JS
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.npm
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Vector DBs and local data (can be large)
+chroma_db/
+faiss_index/
+*.faiss
+*.index
+
+# Model weights (very large, don't commit)
+*.bin
+*.pt
+*.pth
+*.gguf
+*.ggml
+models/
+
+# Outputs
+output/
+outputs/
+*.log
+
+# Student submissions — store separately
+submissions/
