@@ -1,4 +1,4 @@
-# 🤖 Agentic AI: Build Systems That Think, Remember & Act
+# 🤖 Sppot on Agentic AI: Build Systems That Think, Remember & Act
 
 > *"AI is not magic. LLMs are programmable. Agents are just systems with memory + tools + reasoning. You can build this yourself."*
 
@@ -13,7 +13,7 @@
 | **Duration** | 24 Hours (Weekend Batches) |
 | **Schedule** | Saturday & Sunday, 3:00 PM – 6:00 PM |
 | **Starts** | 16th May 2026 (Saturday) |
-| **Fee** | ₹7,000/- (Inclusive of GST) |
+| **Fee** | ₹7,000/- (+ GST) |
 | **Mode** | Hands-on, Project-based Learning |
 
 ---
