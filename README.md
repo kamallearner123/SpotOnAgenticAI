@@ -1,4 +1,4 @@
-# 🤖 Sppot on Agentic AI: Build Systems That Think, Remember & Act
+# 🤖 Spot on Agentic AI: Build Systems That Think, Remember & Act
 
 > *"AI is not magic. LLMs are programmable. Agents are just systems with memory + tools + reasoning. You can build this yourself."*
 
