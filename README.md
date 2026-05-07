@@ -50,16 +50,16 @@ This course is designed for **software developers, backend engineers, and system
 
 | # | Module | Duration | Key Outcome |
 |---|--------|----------|-------------|
-| 01 | [AI Foundations for Developers](./modules/01-ai-foundations/README.md) | 2 hrs | Understand LLMs, tokens, transformers — no math |
-| 02 | [Python for AI Builders](./modules/02-python-for-ai/README.md) | 2 hrs | Call APIs, handle JSON, build simple chatbot |
-| 03 | [Prompt Engineering Deep Dive](./modules/03-prompt-engineering/README.md) | 3 hrs | Master prompting — zero-shot to chain-of-thought |
-| 04 | [GenAI Ecosystem & Tools](./modules/04-genai-ecosystem/README.md) | 2 hrs | Navigate OpenAI, Ollama, LangChain, HuggingFace |
-| 05 | [RAG — Retrieval Augmented Generation](./modules/05-rag/README.md) | 3 hrs | Build PDF chatbots and document search engines |
-| 06 | [Agentic AI Fundamentals](./modules/06-agentic-ai-fundamentals/README.md) | 3 hrs | Understand agents: brain, memory, tools, planning |
-| 07 | [Building AI Agents](./modules/07-building-agents/README.md) | 4 hrs | Build real agents with LangChain, CrewAI, LangGraph |
-| 08 | [MCP & AI Tool Integration](./modules/08-mcp-tool-integration/README.md) | 1.5 hrs | Connect AI to files, browser, APIs, databases |
-| 09 | [AI System Design & Production](./modules/09-system-design-production/README.md) | 2 hrs | Build production-grade AI systems |
-| 10 | [Capstone Projects](./modules/10-capstone-projects/README.md) | 1.5 hrs | Showcase your final project |
+| 01 | [AI Foundations for Developers](./1.Materials/01-ai-foundations/README.md) | 2 hrs | Understand LLMs, tokens, transformers — no math |
+| 02 | [Python for AI Builders](./1.Materials/02-python-for-ai/README.md) | 2 hrs | Call APIs, handle JSON, build simple chatbot |
+| 03 | [Prompt Engineering Deep Dive](./1.Materials/03-prompt-engineering/README.md) | 3 hrs | Master prompting — zero-shot to chain-of-thought |
+| 04 | [GenAI Ecosystem & Tools](./1.Materials/04-genai-ecosystem/README.md) | 2 hrs | Navigate OpenAI, Ollama, LangChain, HuggingFace |
+| 05 | [RAG — Retrieval Augmented Generation](./1.Materials/05-rag/README.md) | 3 hrs | Build PDF chatbots and document search engines |
+| 06 | [Agentic AI Fundamentals](./1.Materials/06-agentic-ai-fundamentals/README.md) | 3 hrs | Understand agents: brain, memory, tools, planning |
+| 07 | [Building AI Agents](./1.Materials/07-building-agents/README.md) | 4 hrs | Build real agents with LangChain, CrewAI, LangGraph |
+| 08 | [MCP & AI Tool Integration](./1.Materials/08-mcp-tool-integration/README.md) | 1.5 hrs | Connect AI to files, browser, APIs, databases |
+| 09 | [AI System Design & Production](./1.Materials/09-system-design-production/README.md) | 2 hrs | Build production-grade AI systems |
+| 10 | [Capstone Projects](./1.Materials/10-capstone-projects/README.md) | 1.5 hrs | Showcase your final project |
 
 ---
 
