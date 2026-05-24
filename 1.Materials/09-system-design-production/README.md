@@ -6,291 +6,233 @@
 
 ## 🎯 Learning Objectives
 
-- Design production-grade AI application architectures
-- Understand token optimization, latency, and cost management
-- Implement security guardrails and rate limiting
-- Add observability and monitoring to AI systems
+By the end of this module, you will:
+* **Design Enterprise AI Topologies:** Architect highly resilient, scalable, and observable production-grade AI system backends.
+* **Implement Advanced Caching:** Compare Exact Match Caching (Redis) with Semantic Caching (GPTCache) to lower latency and API costs.
+* **Master Error Resilience:** Code robust retry architectures incorporating exponential backoff, structural jitter, rate-limit back-offs, and multi-provider model fallbacks.
+* **Enforce Security & Input Guardrails:** Implement user validation layers, input sanitization, PII redaction, and output guardrails.
+* **Establish Centralized Observability:** Instrument metric collectors tracking Latency, Cost, Time-to-First-Token (TTFT), and trace execution graphs.
 
 ---
 
-## Production AI Architecture
+## 🗺️ Topics Covered
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER                          │
-│  Web App  │  Mobile App  │  API Clients  │  Slack Bot       │
-└───────────────────────────┬──────────────────────────────────┘
-                            │
-┌───────────────────────────▼──────────────────────────────────┐
-│                        API GATEWAY                           │
-│  Rate Limiting  │  Auth  │  Load Balancing  │  Logging      │
-└───────────────────────────┬──────────────────────────────────┘
-                            │
-┌───────────────────────────▼──────────────────────────────────┐
-│                      AI APPLICATION                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
-│  │  Guardrails │  │ Prompt Layer  │  │    Caching         │  │
-│  │  (safety)   │  │ (templates)   │  │  (Redis/Memcached) │  │
-│  └─────────────┘  └──────────────┘  └────────────────────┘  │
-└───────────────────────────┬──────────────────────────────────┘
-                            │
-┌───────────────────────────▼──────────────────────────────────┐
-│                        LLM LAYER                             │
-│  Primary: GPT-4o  │  Fallback: GPT-4o-mini  │  Local: Ollama│
-└───────────────────────────┬──────────────────────────────────┘
-                            │
-┌───────────────────────────▼──────────────────────────────────┐
-│                      DATA LAYER                              │
-│  Vector DB  │  PostgreSQL  │  Redis Cache  │  File Storage  │
-└──────────────────────────────────────────────────────────────┘
-```
+1. [Enterprise Production AI System Topologies](#1-enterprise-production-ai-system-topologies)
+2. [AI Caching Architectures: Exact vs. Semantic Caching](#2-ai-caching-architectures-exact-vs-semantic-caching)
+3. [Production Error Resilience: Retries, Jitter, and Fallbacks](#3-production-error-resilience-retries-jitter-and-fallbacks)
+4. [Enterprise Security: Input Sanitization, PII Redaction, and Guardrails](#4-enterprise-security-input-sanitization-pii-redaction-and-guardrails)
+5. [Observability, Latency Metrics & Execution Tracing](#5-observability-latency-metrics--execution-tracing)
 
 ---
 
-## 1. Token Optimization
+## 1. Enterprise Production AI System Topologies
 
-Tokens = money. Optimize them.
+Moving an AI prototype to a production environment requires wrapping the core model inside standard enterprise infrastructure. An AI application must handle authentications, manage costs, survive external API outages, enforce rate limits, and provide complete traceability.
 
-```python
-# BAD: Sending the entire document every time
-def bad_ask(doc: str, question: str) -> str:
-    return client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "user", "content": f"{doc}\n\nQuestion: {question}"}
-        ]
-    )
-
-# GOOD: Use RAG to send only relevant chunks
-def good_ask(collection, question: str) -> str:
-    relevant_chunks = retrieve(collection, question, k=3)  # Only 3 chunks
-    context = "\n".join(relevant_chunks)
-    return client.chat.completions.create(
-        model="gpt-4o-mini",  # cheaper model for simpler tasks
-        messages=[
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
-        ]
-    )
 ```
-
-### Model Selection Strategy
-
-| Task | Recommended Model | Cost |
-|------|-------------------|------|
-| Complex reasoning | GPT-4o / Claude 3.5 | High |
-| Q&A, summarization | GPT-4o-mini / Haiku | Low |
-| Classification | GPT-4o-mini | Very Low |
-| Embeddings | text-embedding-3-small | Minimal |
-| High volume | Groq / Local Ollama | Near zero |
-
----
-
-## 2. Caching
-
-Don't pay for the same LLM call twice.
-
-```python
-import hashlib
-import redis
-import json
-
-redis_client = redis.Redis(host="localhost", port=6379)
-CACHE_TTL = 3600  # 1 hour
-
-def cached_llm_call(prompt: str, model: str = "gpt-4o-mini") -> str:
-    # Create cache key from prompt hash
-    cache_key = f"llm:{hashlib.md5(prompt.encode()).hexdigest()}"
-
-    # Check cache
-    cached = redis_client.get(cache_key)
-    if cached:
-        return json.loads(cached)
-
-    # Make API call
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}]
-    )
-    result = response.choices[0].message.content
-
-    # Cache the result
-    redis_client.setex(cache_key, CACHE_TTL, json.dumps(result))
-
-    return result
+                  ┌──────────────────────────────────────────────┐
+                  │                 CLIENT LAYER                 │
+                  │        (Web, Mobile, Slack, CLI API)         │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                                         ▼
+                  ┌──────────────────────────────────────────────┐
+                  │              GATEWAY / INGRESS               │
+                  │  (Rate Limiter, Auth, HTTPS, Load Balancer)  │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                                         ▼
+                  ┌──────────────────────────────────────────────┐
+                  │             APPLICATION LOGIC                │
+                  │   ┌─────────────┐ ┌─────────────┐ ┌───────┐  │
+                  │   │ Guardrails  │ │Prompt Engine│ │Caching│  │
+                  │   └──────┬──────┘ └──────┬──────┘ └───┬───┘  │
+                  │          │               │            │      │
+                  └──────────┼───────────────┼────────────┼──────┘
+                             │               │            │
+                             ▼               ▼            ▼
+                  ┌──────────────────────────────────────────────┐
+                  │              FOUNDATION LLMs                 │
+                  │   (Primary Cloud, Fallback Cloud, Local)     │
+                  └──────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Rate Limiting
+## 2. AI Caching Architectures: Exact vs. Semantic Caching
 
-Protect your API costs and prevent abuse.
+Model API latency (often 1–5 seconds) represents a major bottleneck for user experiences. To lower latency and save API costs, production backends intercept incoming prompts using a caching layer.
 
-```python
-from fastapi import FastAPI, HTTPException, Depends
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+```
+Exact Match Caching (Redis):
+Prompt: "Explain RAG" ──► MD5 Hash ──► Key: "llm:hash" ──► Found? YES ──► Return response
 
-app = FastAPI()
-limiter = Limiter(key_func=get_remote_address)
-
-@app.post("/api/chat")
-@limiter.limit("10/minute")  # 10 requests per minute per IP
-async def chat(request: ChatRequest):
-    ...
+Semantic Caching (GPTCache):
+Prompt: "Define RAG"  ──► Embed ────► Cosine Search ──► Similarity > 0.95? ──► Return response
+                                                          (Finds "Explain RAG")
 ```
 
-```python
-# Per-user rate limiting with Redis
-def check_rate_limit(user_id: str, max_requests: int = 100, window: int = 3600):
-    key = f"rate:{user_id}"
-    current = redis_client.incr(key)
-    if current == 1:
-        redis_client.expire(key, window)
-    if current > max_requests:
-        raise Exception(f"Rate limit exceeded. Try again in {redis_client.ttl(key)} seconds")
-```
+### Exact Match Caching (Redis)
+* **How it works:** The prompt string is hashed (e.g., using MD5). The hash is used as a lookup key in an in-memory key-value database like Redis.
+* **Pros:** Extremely fast ($< 2 \text{ ms}$ lookup), highly deterministic, and has zero overhead.
+* **Cons:** Brittle. A tiny change in punctuation or a single whitespace change (e.g., `"Explain RAG."` vs `"Explain RAG"`) results in a cache miss.
+
+### Semantic Caching (GPTCache)
+* **How it works:** The incoming prompt is passed through an embedding model to generate its semantic vector. This vector is compared against a database of previously embedded prompts using cosine similarity. If the similarity score exceeds a strict threshold (e.g., $> 0.96$), the system returns the cached completion.
+* **Pros:** Highly resilient. Matches queries with similar meanings even if the wording is different (e.g., `"What is RAG?"` matches `"Explain Retrieval Augmented Generation"`).
+* **Cons:** Slower than exact matching (requires calling the embedding model for the lookup) and can return slightly off-target responses if the threshold is set too low.
 
 ---
 
-## 4. Guardrails & Safety
+## 3. Production Error Resilience: Retries, Jitter, and Fallbacks
+
+API providers frequently experience transient errors, rate limit spikes (HTTP 429), or complete regional outages. Your backend must handle these gracefully to prevent user-facing crashes.
 
 ```python
-# Input validation
-def validate_input(user_message: str) -> str:
-    # Check length
-    if len(user_message) > 2000:
-        raise ValueError("Message too long (max 2000 chars)")
-
-    # Check for injection attempts
-    injection_patterns = [
-        "ignore previous instructions",
-        "you are now",
-        "forget everything",
-        "new system prompt"
-    ]
-    message_lower = user_message.lower()
-    for pattern in injection_patterns:
-        if pattern in message_lower:
-            raise ValueError("Potentially adversarial input detected")
-
-    return user_message
-
-# Output validation
-def validate_output(response: str, topic: str) -> bool:
-    """Check if response is on-topic"""
-    check_prompt = f"""
-    Is this response about {topic}? Answer only YES or NO.
-    Response: {response}
-    """
-    result = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": check_prompt}]
-    )
-    return "YES" in result.choices[0].message.content.upper()
+# PRODUCTION RESILIENCE PIPELINE:
+# 1. Catch Rate Limit Error (HTTP 429)
+# 2. Back off exponentially: wait_time = 2 ^ attempt + random_jitter
+# 3. If primary provider fails completely, route call to Backup Fallback Model
 ```
 
----
-
-## 5. Retry & Fallback
+### Resilient Call Implementation with Jitter and Fallback
 
 ```python
+import os
 import time
+import random
 from openai import OpenAI, RateLimitError, APIError
+from dotenv import load_dotenv
+
+load_dotenv()
+client = OpenAI()
 
 def resilient_llm_call(
     messages: list,
     primary_model: str = "gpt-4o",
     fallback_model: str = "gpt-4o-mini",
-    max_retries: int = 3
+    max_retries: int = 3,
+    base_backoff_sec: float = 1.5
 ) -> str:
-    for attempt in range(max_retries):
+    """
+    Executes an LLM call with exponential backoff, random jitter, 
+    and failover to a backup fallback model.
+    """
+    for attempt in range(1, max_retries + 1):
         try:
+            print(f"[*] Dispatching request to {primary_model} (Attempt {attempt}/{max_retries})...")
             response = client.chat.completions.create(
                 model=primary_model,
-                messages=messages
+                messages=messages,
+                timeout=15.0 # Enforce strict network timeout
             )
             return response.choices[0].message.content
 
-        except RateLimitError:
-            wait_time = 2 ** attempt  # exponential backoff: 1s, 2s, 4s
-            print(f"Rate limited. Waiting {wait_time}s...")
-            time.sleep(wait_time)
+        except RateLimitError as e:
+            # Exponential Backoff with Jitter
+            # Formula: Backoff = (Base * 2 ^ attempt) + Random Uniform Jitter
+            backoff_duration = (base_backoff_sec * (2 ** attempt)) + random.uniform(0.1, 0.5)
+            print(f"[!] Rate Limited (429). Backing off for {backoff_duration:.2f} seconds: {e}")
+            if attempt == max_retries:
+                # If we've run out of retries on the primary model, fall back to the backup model
+                print(f"[✕] Max retries reached on {primary_model}. Attempting failover to {fallback_model}...")
+                break
+            time.sleep(backoff_duration)
 
-        except APIError:
-            # Fallback to cheaper model
-            print(f"API error on {primary_model}. Falling back to {fallback_model}")
-            response = client.chat.completions.create(
-                model=fallback_model,
-                messages=messages
-            )
-            return response.choices[0].message.content
+        except APIError as e:
+            print(f"[!] Server API Error ({e.status_code}) encountered. Initiating fallback failover...")
+            break
 
-    raise Exception("All retry attempts failed")
+    # Failover fallback attempt
+    try:
+        print(f"[*] Dispatching failover request to {fallback_model}...")
+        response = client.chat.completions.create(
+            model=fallback_model,
+            messages=messages
+        )
+        return response.choices[0].message.content
+    except Exception as fatal_error:
+        raise RuntimeError("FATAL: Primary and Fallback model calls both failed.") from fatal_error
 ```
 
 ---
 
-## 6. Observability & Logging
+## 4. Enterprise Security: Input Sanitization, PII Redaction, and Guardrails
+
+To deploy AI systems securely, you must validate and sanitize data at both the entry and exit points of your application.
+
+```
+User Query ──► [1. Input Validator] ──► [2. PII Redaction] ──► LLM ──► [3. Output Guardrail] ──► User
+                 (Blocks Injection)       (Masks emails/keys)           (Verifies safety)
+```
+
+### 1. Input Sanitization (Adversarial Detection)
+* **Goal:** Detect and block prompt injections, system override attempts, or excessive input lengths.
+* **Implementation:** Use length checks, string matching, and automated classifiers to scan incoming user queries before inserting them into your prompt templates.
+
+### 2. PII Redaction
+* **Goal:** Prevent sensitive user data (e.g., credit card numbers, passwords, emails, API keys) from being sent to external third-party model APIs.
+* **Implementation:** Use regex or Named Entity Recognition (NER) models to identify and replace PII with placeholder tags (e.g., replacing `john.doe@email.com` with `[REDACTED_EMAIL]`) before sending the data to the LLM.
 
 ```python
-import logging
-import time
-from dataclasses import dataclass
+import re
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ai_app")
+def redact_sensitive_pii(text: str) -> str:
+    """Masks emails and credit card numbers from raw inputs."""
+    # Simple regex models
+    email_pattern = r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+'
+    card_pattern = r'\b(?:\d[ -]*?){13,16}\b'
+    
+    redacted = re.sub(email_pattern, "[REDACTED_EMAIL]", text)
+    redacted = re.sub(card_pattern, "[REDACTED_CARD]", redacted)
+    return redacted
+```
 
-@dataclass
-class LLMMetrics:
-    model: str
-    prompt_tokens: int
-    completion_tokens: int
-    latency_ms: float
-    success: bool
-    error: str = None
+### 3. Output Guardrails (Verification)
+* **Goal:** Verify that the generated output is on-topic, safe, and free from sensitive system secrets.
+* **Implementation:** Programmatically scan the output text or use a lightweight guard model (e.g., Llama Guard) to classify the safety and policy alignment of the response before returning it to the user.
 
-def instrumented_call(messages: list, model: str = "gpt-4o-mini") -> tuple[str, LLMMetrics]:
-    start = time.time()
+---
 
-    try:
-        response = client.chat.completions.create(model=model, messages=messages)
-        content = response.choices[0].message.content
-        latency = (time.time() - start) * 1000
+## 5. Observability, Latency Metrics & Execution Tracing
 
-        metrics = LLMMetrics(
-            model=model,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-            latency_ms=latency,
-            success=True
-        )
-        logger.info(f"LLM call | model={model} | tokens={metrics.prompt_tokens+metrics.completion_tokens} | latency={latency:.0f}ms")
-        return content, metrics
+To debug and optimize complex AI pipelines, you must move beyond simple logging and implement structured metric collection and execution tracing.
 
-    except Exception as e:
-        metrics = LLMMetrics(model=model, prompt_tokens=0, completion_tokens=0, latency_ms=0, success=False, error=str(e))
-        logger.error(f"LLM call FAILED | model={model} | error={e}")
-        raise
+### Structured Metric Collection
+Every LLM call should be measured and logged with precise metadata:
+* **Time-to-First-Token (TTFT):** The time elapsed between sending the request and receiving the first generated token. Highly critical for streaming interfaces.
+* **Tokens Per Second:** The speed of generation, calculated as $\frac{\text{Completion Tokens}}{\text{Latency in seconds}}$.
+* **Cost Tracking:** The financial cost of the call, calculated dynamically based on input and output token counts.
+
+### Centralized Execution Tracing
+For multi-step pipelines (like a RAG search that retrieves chunks, rerankes them, and then runs an agent loop), a single request can trigger dozens of model calls and database queries. 
+
+Centralized tracing platforms (such as **LangSmith** or **Arize Phoenix**) serialize and track these execution chains, generating clean visual graphs that show exactly which step failed, which node caused high latency, or where costs spiked.
+
+```
+LangSmith Execution Trace:
+└─ [1. PDF Query Agent] (Latency: 2.1s, Cost: $0.004)
+   ├─ [2. Document Retrieval] (Latency: 0.3s)
+   │  └─ [3. Cosine Vector Search] (Latency: 0.1s)
+   └─ [4. ReAct Reasoning Loop] (Latency: 1.8s)
+      ├─ [5. Tool Call: compute_metrics] (Latency: 0.2s)
+      └─ [6. Synthesis Generation] (Latency: 0.6s)
 ```
 
 ---
 
-## How Companies Build Production AI Systems
+## 🔨 Hands-On Production Labs
 
-```
-1. Start with a working prototype (LangChain / direct API)
-2. Add prompt templates and versioning
-3. Implement caching for repeated queries
-4. Add rate limiting and auth
-5. Add monitoring (LangSmith / custom logging)
-6. Set up cost alerts (OpenAI dashboard)
-7. Add human-in-the-loop for critical actions
-8. Evaluate quality with evals framework
-9. A/B test different models/prompts
-10. Iterate based on real user feedback
-```
+In this module's labs, you will design and build enterprise-grade guardrails:
+
+1. **The Semantic Caching Proxy:** Build a local API server using FastAPI and Redis that intercepts incoming queries, embeds them, and uses a similarity lookup to return cached LLM responses.
+2. **Developing the Input/Output Security Gateway:** Build a middleware pipeline that sanitizes inputs for prompt injections, redacts PII using regex, and validates outputs against strict formatting and safety rules.
+3. **Pipeline Instrumentation & Latency Tracker:** Implement a structured decorator in Python that measures and logs detailed metrics for every model call: prompt and completion tokens, total cost, latency, and tokens-per-second.
 
 ---
 
-## 📝 MCQs → [mcqs.md](./mcqs.md)
-## 💻 Assignment → [assignments.md](./assignments.md)
+## 📝 MCQ Verification → [mcqs.md](./mcqs.md)
+* Consolidate your systems-engineering understanding of semantic caching, exponential backoffs, rate limiters, input guardrails, and observability tools with 10 conceptual check questions.
+
+## 💻 Coding Assignment → [assignments.md](./assignments.md)
+* **Objective:** Build a resilient, cost-optimized, and observable production pipeline. You must build a FastAPI endpoint that integrates a Redis-based exact match cache, sanitizes inputs, executes model calls through an exponential backoff retry loop, falls back to a cheaper model if the primary model fails, and records detailed latency, cost, and usage metrics to a local log file.

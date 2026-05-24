@@ -6,162 +6,267 @@
 
 ## 🎯 Capstone Day Goals
 
-- Present your capstone project (8–10 minutes per person)
-- Demonstrate working code — not slides
-- Receive feedback from trainer and peers
-- Celebrate completing the course! 🎉
+By the end of this final module, you will:
+* **Present an End-to-End System:** Showcase a production-ready, autonomous AI system to your peers and the trainer.
+* **Demonstrate Real Working Code:** Deliver a live, interactive demonstration of your system running in real-time (not just slides).
+* **Discuss System Architectures:** Walk through your design choices, state machines, database schemas, and guardrail implementations.
+* **Graduate as an AI System Engineer:** Celebrate completing the masterclass and receive your course certification! 🎉
 
 ---
 
-## Capstone Requirements
+## 🗺️ Topics Covered
 
-Your capstone must:
-1. ✅ Use at least one LLM (cloud or local)
-2. ✅ Use at least 2 of the following: Tools, RAG, Memory, Multi-agent, MCP
-3. ✅ Solve a real problem you care about
-4. ✅ Include a live demo
-5. ✅ Be submitted as a GitHub repository with a clear README
+1. [Capstone Project Tracks & Boilerplate Architectures](#1-capstone-project-tracks--boilerplate-architectures)
+2. [Project Rubric and Rigorous Evaluation Criteria](#2-project-rubric-and-rigorous-evaluation-criteria)
+3. [Presentation Framework & Architecture Walkthroughs](#3-presentation-framework--architecture-walkthroughs)
+4. [Submission Checklist and Production Requirements](#4-submission-checklist-and-production-requirements)
 
 ---
 
-## Project Ideas
+## 1. Capstone Project Tracks & Boilerplate Architectures
 
-### 1. 🤖 Personal AI Assistant
+Your capstone project must integrate at least **two** core architectural patterns built during the course (e.g., combining custom RAG with tool-calling agents, or building stateful multi-agent graphs with secure local sandboxes).
+
+Here are three curated tracks with concrete boilerplate starter skeletons to jumpstart your development:
+
+---
+
+### Track A: The Enterprise PDF Chatbot & RAG Assistant
+
+A system designed to ingest, chunk, embed, and query massive collections of technical documentation with verified citations.
+
 ```
-What: A terminal or web-based personal assistant
-Tools: Web search, file management, calendar/notes
-Memory: Persistent long-term memory (ChromaDB)
-Skills: Remembers your preferences, learns over time
-
-Demo script:
-- "Add a reminder to prepare for standup at 9am tomorrow"
-- "What did I work on last week?" (reads your notes)
-- "Find that email I saved about the AWS migration"
-```
-
-### 2. 🎓 Interview Preparation Agent
-```
-What: AI that conducts mock technical interviews
-Tools: Code runner, web search for latest interview trends
-Multi-agent: Interviewer agent + Evaluator agent
-RAG: Index top interview Q&A from PDFs
-
-Demo script:
-- Start a Python interview session
-- Answer questions, get real-time feedback
-- Receive a performance report at the end
+┌────────────────────────────────────────────────────────┐
+│                      TRACK A PATH                      │
+├────────────────────────────────────────────────────────┤
+│ Parse PDFs ──► Recursive Split ──► ChromaDB + Reranker │
+│                                         │              │
+│                                         ▼              │
+│ Stream Grounded Answer ◄─────── Grounding Prompt       │
+└────────────────────────────────────────────────────────┘
 ```
 
-### 3. 🛎️ Customer Support Bot
-```
-What: Domain-specific support chatbot
-RAG: Company docs, FAQs, product manuals
-Tools: Ticket creation, knowledge base search
-Guardrails: Only answers in-scope questions
+#### Key Architecture Components
+* **Ingestion:** Page-aware recursive text parser.
+* **Database:** ChromaDB or pgvector with an HNSW index.
+* **Retrieval:** Cosine semantic similarity + sparse keyword (BM25) matching + Cohere/BGE reranker.
+* **UI:** Streamlit or FastAPI background socket API.
 
-Demo script:
-- "How do I reset my password?"
-- "I want a refund" (creates support ticket)
-- "What are your business hours?"
-```
+#### Structural Boilerplate Setup
+```python
+# File: RAG_Boilerplate.py
+import chromadb
+from openai import OpenAI
+from pydantic import BaseModel, Field
 
-### 4. ⚙️ AI DevOps Assistant
-```
-What: CLI agent for infrastructure tasks
-Tools: Shell commands, GitHub API, log reader
-Memory: Remembers common issues and their fixes
-Safety: Requires confirmation before destructive ops
+class CitedResponse(BaseModel):
+    answer: str = Field(description="The final answer derived ONLY from the provided context.")
+    citations: list[str] = Field(description="List of document identifiers explicitly referenced in the answer.")
 
-Demo script:
-- "Check server logs for errors in last hour"
-- "Open a GitHub issue for the memory leak we fixed"
-- "What issues did we have last week?"
-```
+class EnterpriseRAGPipeline:
+    def __init__(self, collection_name: str = "capstone_docs"):
+        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        self.client = OpenAI()
+        self.collection = self.chroma_client.get_or_create_collection(name=collection_name)
 
-### 5. 📚 AI Teacher / Tutor
-```
-What: Subject-specific tutoring agent
-RAG: Course materials, textbooks
-Multi-agent: Explainer + Quiz generator + Progress tracker
-Memory: Tracks what student has learned
+    def retrieve_grounded_context(self, query: str, top_k: int = 5) -> str:
+        # Vector retrieval logic goes here
+        pass
 
-Demo script:
-- "Explain recursion to me"
-- "Give me a practice problem"
-- "What topics haven't I covered yet?"
-```
-
-### 6. 🔬 Autonomous Research Agent
-```
-What: Agent that researches any topic deeply
-Tools: Web search, PDF reader, note taker
-Multi-agent: Search → Read → Synthesize → Write
-Output: Structured research report
-
-Demo script:
-- "Research the current state of quantum computing in 2026"
-- Agent autonomously searches, reads 10+ sources, synthesizes
-- Produces a 1000-word report with citations
+    def synthesize_answer(self, query: str) -> CitedResponse:
+        context = self.retrieve_grounded_context(query)
+        
+        response = self.client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Answer the user query using only the provided context. Return citations."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuery: {query}"}
+            ],
+            response_format=CitedResponse
+        )
+        return response.choices[0].message.parsed
 ```
 
 ---
 
-## Presentation Structure (8–10 minutes)
+### Track B: Autonomous Web Search & Deep Research Agent
+
+An agent that takes a research objective, plans its query strategy, browses the web, downloads pages, synthesizes facts, and outputs a structured Markdown report.
 
 ```
-1. Problem Statement (1 min)
-   "I built this because..."
+┌────────────────────────────────────────────────────────┐
+│                      TRACK B PATH                      │
+├────────────────────────────────────────────────────────┤
+│ Goal ──► Planning Loop ──► Web Search ──► Page Scrape  │
+│                             ▲                  │       │
+│                             └──── Observation ─┘       │
+│                                        │               │
+│                                        ▼               │
+│                            Synthesize Markdown Report  │
+└────────────────────────────────────────────────────────┘
+```
 
-2. Architecture (2 min)
-   - What components did you use?
-   - Show a quick diagram
+#### Key Architecture Components
+* **Brain:** ReAct reasoning loop.
+* **Capabilities:** Tavily/DuckDuckGo API for search, BeautifulSoup/Selenium for scraping, and a local markdown file writer.
+* **Memory:** Conversation state buffer combined with a SQLite database to cache past query outcomes.
 
-3. Live Demo (4 min)
-   - Show real working code
-   - Demonstrate at least 2 features
+#### Structural Boilerplate Setup
+```python
+# File: Research_Agent_Boilerplate.py
+from crewai import Agent, Task, Crew, Process
+from langchain_openai import ChatOpenAI
 
-4. Challenges & Learnings (2 min)
-   - What was hard?
-   - What would you do differently?
+class DeepResearchCrew:
+    def __init__(self, topic: str):
+        self.topic = topic
+        self.llm = ChatOpenAI(model="gpt-4o", temperature=0.2)
 
-5. Q&A (1 min)
+    def assemble_crew(self) -> str:
+        # Define agents with roles and goals
+        researcher = Agent(
+            role="Information Retrieval Specialist",
+            goal="Locate raw, verified facts and data points about the target topic.",
+            backstory="You search the web objectively, locating academic papers and reliable reports.",
+            llm=self.llm,
+            verbose=True
+        )
+        writer = Agent(
+            role="Lead Technical Writer",
+            goal="Synthesize raw facts into a comprehensive technical document.",
+            backstory="You structure raw notes into beautiful markdown files with clear tables.",
+            llm=self.llm,
+            verbose=True
+        )
+        
+        # Define sequential tasks
+        t1 = Task(description=f"Gather detailed metrics about {self.topic}.", expected_output="Raw bulleted notes.", agent=researcher)
+        t2 = Task(description="Draft the final markdown report.", expected_output="A complete Markdown file.", agent=writer)
+        
+        crew = Crew(agents=[researcher, writer], tasks=[t1, t2], process=Process.sequential)
+        return crew.kickoff()
 ```
 
 ---
 
-## Evaluation Criteria
+### Track C: Autonomous Coding & Execution Assistant
 
-| Criteria | Weight |
-|----------|--------|
-| Does it actually work? (live demo) | 40% |
-| Technical depth (complexity of AI components used) | 25% |
-| Problem relevance and creativity | 20% |
-| Code quality and documentation | 15% |
+An agent that reads software code, executes it inside a subprocess sandbox, redirects stderr to its own prompt context, and iteratively self-corrects until it compiles and runs without errors.
+
+```
+┌────────────────────────────────────────────────────────┐
+│                      TRACK C PATH                      │
+├────────────────────────────────────────────────────────┤
+│ Prompt ──► Write Code ──► Subprocess Run ──► Success?  │
+│                              ▲                  │      │
+│                              └───── Traceback ──┘      │
+│                                        │               │
+│                                        ▼               │
+│                                   Exit Sandbox (END)   │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Key Architecture Components
+* **State Management:** LangGraph cyclic state schema.
+* **Nodes:** Code generation, local sandbox compilation, and verification tests.
+* **Security:** Command whitelist, process isolation, and runtime timeouts.
+
+#### Structural Boilerplate Setup
+```python
+# File: Coding_Graph_Boilerplate.py
+from typing import TypedDict
+from langgraph.graph import StateGraph, END
+from langchain_openai import ChatOpenAI
+
+class CoderState(TypedDict):
+    objective: str
+    code: str
+    traceback: str
+    attempts: int
+
+class CodeAgentGraph:
+    def __init__(self):
+        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+        self.graph = StateGraph(CoderState)
+        
+    def generate_code_node(self, state: CoderState) -> dict:
+        # Code generation logic goes here
+        pass
+
+    def execute_sandbox_node(self, state: CoderState) -> dict:
+        # Subprocess execution and traceback capture logic goes here
+        pass
+
+    def route_evaluation(self, state: CoderState) -> str:
+        # Routing logic (success/fail/retry) goes here
+        pass
+```
 
 ---
 
-## Submission Checklist
+## 2. Project Rubric and Rigorous Evaluation Criteria
 
-Before June 15, make sure your repo has:
+Your capstone project will be evaluated by the trainer and graded according to four core enterprise metrics:
 
-- [ ] `README.md` with project description and setup instructions
-- [ ] `requirements.txt` or `pyproject.toml`
-- [ ] `.env.example` (API keys template, never commit real keys)
-- [ ] Working code that the trainer can run
-- [ ] Brief architecture diagram (even ASCII art is fine)
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                         CAPSTONE EVALUATION METRICS                    │
+├───────────────────┬──────────────────┬─────────────────┬───────────────┤
+│ 1. SYSTEM LAB     │ 2. RESILIENCE    │ 3. SECURITY     │ 4. QUALITY    │
+│    (Live Demo)    │   (Exceptions)   │  (Guardrails)   │  (Code Specs) │
+│       [40%]       │      [25%]       │      [20%]      │     [15%]     │
+└───────────────────┴──────────────────┴─────────────────┴───────────────┘
+```
+
+### 1. Functional System Loop (40%)
+* *Standard:* The application must execute a complete, successful loop live in front of the cohort. Slides and static screenshots are not acceptable. The system must process real, unscripted user input and successfully generate the expected outcome.
+
+### 2. Error Resilience & Exception Handling (25%)
+* *Standard:* How does the system handle network dropouts, rate limit spikes (HTTP 429), or empty search queries? The system should implement robust error recovery (exponential backoffs with jitter, model fallbacks, retry parameters, and validation recovery).
+
+### 3. API Security & Guardrails (20%)
+* *Standard:* The system must implement robust security practices (never committing API keys to GitHub, sanitizing input vectors for prompt injection attempts, redacting sensitive user PII before sending it to third-party APIs, and running execution sandboxes with strict command whitelists and timeouts).
+
+### 4. Code Quality & Systems Architecture (15%)
+* *Standard:* Clear structure of components, clean separation of concern patterns (e.g., separating prompts from main logic), proper logging and observability tracing, and a readable repository with clear environment setup instructions in the `README.md`.
 
 ---
 
-## 🏆 Awards
+## 3. Presentation Framework & Architecture Walkthroughs
 
-- **Best Technical Implementation** — Most complex/impressive use of AI components
-- **Best Problem Solved** — Most useful/practical project
-- **Best Presentation** — Clearest and most engaging demo
+On Capstone Day, you will have **8 to 10 minutes** to present your project. Structure your presentation to focus on system engineering:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│               CAPSTONE PRESENTATION SLICES               │
+├──────────────────────────────────────────────────────────┤
+│ 1. Problem Statement & Architecture Diagram      [2 min] │
+│ 2. Deep Dive: Dynamic Logic & Guardrails         [2 min] │
+│ 3. Working Live System Demonstration             [4 min] │
+│ 4. Engineering Trade-offs & Future Work          [2 min] │
+└──────────────────────────────────────────────────────────┘
+```
+
+1. **Problem Statement & Architecture (2 minutes):** Describe the concrete engineering problem your system solves. Walk through your system architecture diagram, explaining the flow of data, state updates, databases, and tool-calling models.
+2. **Deep Dive: Logic & Resilience (2 minutes):** Walk through a key, complex section of your code (e.g., your LangGraph state transitions, your custom RAG embedding/reranking loop, or your input sanitization guardrails). Explain the technical design choices behind this implementation.
+3. **Live Demonstration (4 minutes):** Demonstrate your working system live. Run a few unscripted test scenarios to show how your agent plans, executes actions, recovers from errors, and delivers the final output.
+4. **Engineering Trade-offs & Future Work (2 minutes):** Discuss what was hard, what engineering compromises you had to make (e.g., balancing cost vs. accuracy), and how you would scale the architecture for enterprise production environments.
 
 ---
 
-## Past Inspiration
+## 4. Submission Checklist and Production Requirements
 
-> "The best capstone projects aren't the most complex — they're the ones that solve a real problem that the builder genuinely had."
->
-> — Kamal Kumar Mukiri
+Ensure your final project repository contains all of the following components before Capstone Day (June 15):
+
+* [ ] **Comprehensive `README.md`:** Detailed description of the system, a clean system architecture diagram, precise environment setup instructions using standard dependency locking tools (`requirements.txt` or `pyproject.toml`), and usage guides.
+* [ ] **Environment Security Template (`.env.example`):** A template file documenting required environment variables (e.g., `OPENAI_API_KEY`, `TAVILY_API_KEY`). **Never commit your actual `.env` file containing active private API keys to your repository.**
+* [ ] **Robust Code Architecture:** Highly commented, type-safe, and cleanly structured python codebase. Custom tools, prompt templates, database configurations, and application interfaces must be modularized and cleanly separated.
+* [ ] **Aesthetic User Interface:** A clean command-line interface with detailed progress logging, or a beautiful web-based interface (e.g., built with Streamlit, FastAPI, or Gradio).
+
+---
+
+## 🏆 Graduation Awards
+
+* **Best Technical Implementation:** Awarded to the project demonstrating the highest technical depth, robust error resilience, and complex, stateful execution graphs.
+* **Most Pragmatic System:** Awarded to the project that addresses a high-impact, real-world business problem with a highly cost-efficient and practical architecture.
+* **Best Systems Design Presentation:** Awarded to the builder who delivers the clearest architectural breakdown, best documentation, and cleanest live demonstration.

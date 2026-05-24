@@ -5,7 +5,7 @@
 **Q1.** Ollama is best described as:
 
 - A) A cloud LLM provider like OpenAI
-- B) A tool for running open-source LLMs locally on your machine ✅
+- B) A tool for running open-source LLMs locally on your machine
 - C) A Python framework for building AI agents
 - D) A vector database for storing embeddings
 
@@ -15,7 +15,7 @@
 
 - A) LangChain
 - B) LlamaIndex
-- C) CrewAI ✅
+- C) CrewAI
 - D) FAISS
 
 ---
@@ -23,7 +23,7 @@
 **Q3.** LangChain's LCEL (LangChain Expression Language) uses the `|` operator to:
 
 - A) Compare two values
-- B) Chain components (prompt → model → parser) in a pipeline ✅
+- B) Chain components (prompt → model → parser) in a pipeline
 - C) Perform bitwise OR on embeddings
 - D) Define agent tools
 
@@ -33,7 +33,7 @@
 
 - A) An API key always
 - B) A GPU always
-- C) No API key — it downloads and runs models locally ✅
+- C) No API key — it downloads and runs models locally
 - D) A paid subscription
 
 ---
@@ -42,7 +42,7 @@
 
 - A) More capable models
 - B) Cheaper pricing
-- C) Much faster inference speed ✅
+- C) Much faster inference speed
 - D) Better privacy
 
 ---
@@ -51,7 +51,7 @@
 
 - A) `pip install llama3`
 - B) `huggingface-cli download meta-llama/Llama-3`
-- C) `ollama run llama3` ✅
+- C) `ollama run llama3`
 - D) `python -m llama3 serve`
 
 ---
@@ -59,7 +59,7 @@
 **Q7.** LlamaIndex is primarily optimized for:
 
 - A) Building multi-agent systems
-- B) Document ingestion, indexing, and Q&A (RAG) ✅
+- B) Document ingestion, indexing, and Q&A (RAG)
 - C) Training new language models
 - D) Running models on mobile devices
 
@@ -69,7 +69,7 @@
 
 - A) Simple single-step LLM calls
 - B) Creating vector databases
-- C) Complex stateful agent workflows with loops and conditionals ✅
+- C) Complex stateful agent workflows with loops and conditionals
 - D) Fine-tuning open-source models
 
 ---
@@ -77,7 +77,7 @@
 **Q9.** Ollama's API is compatible with which other API?
 
 - A) HuggingFace Inference API
-- B) OpenAI API ✅
+- B) OpenAI API
 - C) Anthropic API
 - D) Cohere API
 
@@ -87,9 +87,26 @@
 
 - A) You need the highest quality output
 - B) You need to process very long documents
-- C) You want a lightweight model that runs well on CPU ✅
+- C) You want a lightweight model that runs well on CPU
 - D) You're building a multimodal application
 
 ---
 
 **Score:** ___/10
+
+---
+
+## Answer Key
+
+| Question | Correct Answer |
+| :---: | :---: |
+| **Q1** | B |
+| **Q2** | C |
+| **Q3** | B |
+| **Q4** | C |
+| **Q5** | C |
+| **Q6** | C |
+| **Q7** | B |
+| **Q8** | C |
+| **Q9** | B |
+| **Q10** | C |

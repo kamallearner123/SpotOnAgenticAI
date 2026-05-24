@@ -6,320 +6,231 @@
 
 ## 🎯 Learning Objectives
 
-- Understand why LLMs need external memory and how RAG solves it
-- Build a complete RAG pipeline from scratch
-- Create a working PDF chatbot using ChromaDB
-- Understand chunking strategies and their impact on quality
+By the end of this module, you will:
+* **Master the RAG Architecture:** Design end-to-end Retrieval Augmented Generation pipelines from first principles.
+* **Optimize Chunking Pipelines:** Compare recursive, token-based, and semantic chunking strategies, adjusting sizes and overlaps for optimal performance.
+* **Navigate Vector Databases:** Understand vector indexing structures (HNSW, IVF, Flat) and select appropriate distance metrics (Cosine, Dot Product, $L_2$).
+* **Implement Advanced Retrieval:** Integrate Hybrid Search (Sparse BM25 + Dense Vector) and Cross-Encoder Reranking to maximize precision.
+* **Quantitatively Evaluate Pipelines:** Set up RAGAS-inspired evaluation frameworks to monitor Faithfulness, Answer Relevance, and Context Recall.
 
 ---
 
-## The Core Problem RAG Solves
+## 🗺️ Topics Covered
 
-```
-❌ Without RAG:
-User: "What does our company policy say about remote work?"
-LLM: "I don't have access to your company's documents..." (or worse — hallucinates)
-
-✅ With RAG:
-1. Search your documents for "remote work policy"
-2. Find the relevant section
-3. Send it to the LLM as context
-4. LLM answers based on REAL data
-```
+1. [The Architectural Paradigm: Grounding vs. Fine-Tuning](#1-the-architectural-paradigm-grounding-vs-fine-tuning)
+2. [Document Ingestion and Advanced Chunking Strategies](#2-document-ingestion-and-advanced-chunking-strategies)
+3. [Vector Databases: Indexing Mechanics and Math](#3-vector-databases-indexing-mechanics-and-math)
+4. [Advanced Retrieval: Hybrid Search and Cross-Encoder Reranking](#4-advanced-retrieval-hybrid-search-and-cross-encoder-reranking)
+5. [The Generation Phase: Proven Prompt Grounding Patterns](#5-the-generation-phase-proven-prompt-grounding-patterns)
+6. [RAG Evaluation: Faithfulness, Relevance, and Recall](#6-rag-evaluation-faithfulness-relevance-and-recall)
 
 ---
 
-## The RAG Pipeline
+## 1. The Architectural Paradigm: Grounding vs. Fine-Tuning
+
+Large Language Models excel at reasoning, but their knowledge is frozen at their training cutoff date. When asked about custom company files, new public developments, or highly specific database keys, standard models either fail or hallucinate plausible-sounding lies.
+
+To solve this, developers use two primary strategies:
+* **Fine-Tuning:** Backpropagating new knowledge directly into the neural network's parameter weights. 
+  * *Trade-off:* Slow, expensive, complex, prone to catastrophic forgetting, and cannot enforce strict document-level security.
+* **Retrieval Augmented Generation (RAG):** Retrieving highly relevant factual sections from external documents dynamically at runtime, injecting them directly into the context window, and instructing the model to synthesize the final answer based *only* on the retrieved context.
+
+### Complete RAG Pipeline Architecture
 
 ```
-INDEXING (one-time):
-Documents → Chunks → Embeddings → Vector DB
+1. INGESTION PIPELINE (Offline / Event-Driven):
+Raw Files (PDFs/Web) ──► Load & Parse ──► Chunking ──► Embedding Model ──► Vector Database
+                                                                           (HNSW Index)
 
-RETRIEVAL (every query):
-User Question → Embed → Search Vector DB → Top K Chunks
-
-GENERATION:
-Prompt = System + Retrieved Chunks + User Question → LLM → Answer
-```
-
----
-
-## Topics Covered
-
-1. [Embeddings Deep Dive](#1-embeddings)
-2. [Chunking Strategies](#2-chunking)
-3. [Vector Databases](#3-vector-databases)
-4. [Building the Retrieval Pipeline](#4-retrieval-pipeline)
-5. [Hands-on: PDF Chatbot](#5-pdf-chatbot)
-6. [Advanced: Hybrid Search](#6-advanced)
-
----
-
-## 1. Embeddings
-
-Embeddings convert text into vectors (lists of numbers) where **similar text has similar vectors**.
-
-```python
-from openai import OpenAI
-
-client = OpenAI()
-
-def embed(text: str) -> list[float]:
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text
-    )
-    return response.data[0].embedding
-
-v1 = embed("Python programming language")
-v2 = embed("Software development with Python")
-v3 = embed("Cooking Italian pasta")
-
-# v1 and v2 are close; v3 is far away
-print(f"Embedding dimensions: {len(v1)}")  # 1536
-```
-
-### Cosine Similarity
-```python
-import numpy as np
-
-def cosine_similarity(a, b):
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
-print(cosine_similarity(v1, v2))  # ~0.93 (very similar)
-print(cosine_similarity(v1, v3))  # ~0.15 (very different)
+2. RETRIEVAL & GENERATION PIPELINE (Runtime):
+User Query ─────────────────► [Embedding Model] ───────────────────┐
+                                   │                               ▼
+                                   │                           Vector Search (Top K)
+                                   ▼                               ▼
+User Query ─────────────────► [Reranker] ◄──────────────────── Retrieved Chunks
+                                   │
+                                   ▼ (Top P Reranked Chunks)
+Prompt Assembler (System Instructions + Grounded Context + Query) ──► LLM ──► Answer
 ```
 
 ---
 
-## 2. Chunking
+## 2. Document Ingestion and Advanced Chunking Strategies
 
-LLMs have token limits — you can't embed an entire book at once. You must chunk it.
+A RAG pipeline is only as good as the context it retrieves. If your chunking strategy cuts a crucial sentence or formula in half, the meaning is lost.
 
-### Fixed-size Chunking
-```python
-def fixed_chunks(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunks.append(text[start:end])
-        start = end - overlap  # overlap prevents cutting mid-sentence
-    return chunks
+### Chunking Strategies Analysis
+
+```
+Recursive Chunking:
+"This is a long sentence. We split it on separators dynamically."
+├── Chunk 1: "This is a long sentence."
+└── Chunk 2: "We split it on separators dynamically."
+
+Semantic Chunking:
+"Sentence A. Sentence B. [Similarity Gap] Sentence C."
+├── Chunk 1: "Sentence A. Sentence B." (Semantically aligned)
+└── Chunk 2: "Sentence C." (Focus shifts to a new topic)
 ```
 
-### Sentence-aware Chunking (better)
+#### 1. Character-Based / Fixed-Size Chunking
+* **Method:** Splits text into a set number of characters (e.g., 500 characters) regardless of word boundaries.
+* **Pros:** Extremely fast and simple.
+* **Cons:** Brittle. Frequently cuts words, code blocks, or sentences in half, causing significant semantic fragmentation.
+
+#### 2. Recursive Character Chunking
+* **Method:** Iteratively splits text based on a hierarchical list of separators (typically `["\n\n", "\n", ".", " ", ""]`). It attempts to keep paragraphs, then sentences, and finally words together in a single chunk.
+* **Pros:** Highly reliable and the default standard for general text documents.
+
 ```python
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,      # characters per chunk
-    chunk_overlap=200,    # overlap between chunks
-    separators=["\n\n", "\n", ".", " "]  # try these in order
+    chunk_size=800,      # Target character count per chunk
+    chunk_overlap=150,   # Overlap characters to prevent loss of context at boundaries
+    separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""]
 )
-
-chunks = splitter.split_text(document_text)
-print(f"Created {len(chunks)} chunks")
+chunks = splitter.split_text(raw_document_content)
 ```
 
-### Chunking Strategy Guide
-
-| Strategy | Chunk Size | Best For |
-|----------|-----------|----------|
-| Small chunks | 200-500 chars | Precise retrieval, Q&A |
-| Medium chunks | 500-1000 chars | General documents |
-| Large chunks | 1000-2000 chars | Summaries, context |
-| Semantic chunks | Variable | Best quality, more complex |
+#### 3. Semantic Chunking
+* **Method:** Rather than using arbitrary character counts, semantic chunking splits the document into sentences. It embeds each sentence and calculates the cosine distance between consecutive sentences. If the distance exceeds a specific threshold, it triggers a chunk boundary, ensuring each chunk focuses on a single, coherent topic.
+* **Pros:** Exceptional retrieval quality. Excellent for complex technical articles.
+* **Cons:** Slower. Requires calling the embedding model for every sentence during ingestion.
 
 ---
 
-## 3. Vector Databases
+## 3. Vector Databases: Indexing Mechanics and Math
 
-### ChromaDB (Local, Free, Easy)
-```python
-import chromadb
+A **Vector Database** is a database designed to index, store, and query high-dimensional vector representations fast. 
 
-# Create client and collection
-client = chromadb.Client()
-collection = client.create_collection("my_documents")
+### Core Indexing Mechanisms
+Linear search (comparing a query vector against millions of document vectors one-by-one) is far too slow for production systems. Vector databases use approximate nearest neighbor (ANN) indexes to trade a tiny amount of accuracy for orders-of-magnitude speedups.
 
-# Add documents
-collection.add(
-    documents=["Python is great for AI", "JavaScript is used for web"],
-    ids=["doc1", "doc2"],
-    metadatas=[{"source": "notes.txt"}, {"source": "web.txt"}]
-)
-
-# Query
-results = collection.query(
-    query_texts=["best language for machine learning"],
-    n_results=2
-)
-print(results["documents"])
+```
+       HNSW Graph Index:
+       (Layer 2 - Sparsest)   O ───────────── O
+                               │             │
+       (Layer 1 - Moderate)   O ─── O ─────── O ─── O
+                               │     │       │     │
+       (Layer 0 - Dense)      O ─ O ─ O ─ O ─ O ─ O ─ O
 ```
 
-### FAISS (Facebook AI Similarity Search — Fast)
-```python
-import faiss
-import numpy as np
+* **Flat Index (Exact Search):** No index structure is built. Performs a raw linear scan.
+  * *Use Case:* High-accuracy requirements on small datasets ($< 10,000$ items).
+* **IVF (Inverted File Index):** Groups vectors into clusters using k-means. Queries are compared only against the centroids of the nearest clusters.
+  * *Use Case:* Large datasets with tight memory limits.
+* **HNSW (Hierarchical Navigable Small World):** Builds a multi-layered graph index. High layers have sparse connections for fast traversal across clusters; lower layers contain dense connections for precise local searches.
+  * *Use Case:* The industry standard for high-performance production vector search.
 
-dimension = 1536  # OpenAI embedding size
-index = faiss.IndexFlatL2(dimension)
+### Math of Distance Metrics
+Ensure your database index distance metric matches the training objective of your embedding model:
 
-# Add vectors
-vectors = np.array([embed(text) for text in documents], dtype="float32")
-index.add(vectors)
-
-# Search
-query_vector = np.array([embed("your question")], dtype="float32")
-distances, indices = index.search(query_vector, k=5)
-```
+* **Cosine Similarity:** Focuses purely on direction rather than magnitude. Excellent for varying document lengths.
+* **Inner Product (Dot Product):** Extremely fast if vectors are pre-normalized to unit length.
+* **Euclidean ($L_2$) Distance:** Measures the straight-line distance between vector coordinates. Highly sensitive to vector scale.
 
 ---
 
-## 4. Retrieval Pipeline
+## 4. Advanced Retrieval: Hybrid Search and Cross-Encoder Reranking
+
+Standard semantic vector search is excellent at capturing abstract concepts, but it can fail on exact terms, product codes, SKU numbers, or specific function names (e.g., searching for `CVE-2026-1011` might retrieve general security articles rather than the specific vulnerability report).
+
+### Hybrid Search (Dense + Sparse)
+To build a highly resilient search engine, we combine:
+* **Dense Retrieval (Semantic Search):** Captures high-level concepts and synonyms using vector embeddings.
+* **Sparse Retrieval (Keyword Search / BM25):** Matches exact strings, product IDs, and proper nouns using term frequency metrics.
+
+We combine these results using algorithms like **Reciprocal Rank Fusion (RRF)** to generate a unified, high-precision ranking list.
+
+```
+User Query: "How to fix CVE-2026-4412"
+  │
+  ├──► Sparse Search (BM25) ──► [doc_A: Rank 1, doc_B: Rank 2] ────┐
+  │                                                                 ▼
+  └──► Dense Search (Vector) ─► [doc_C: Rank 1, doc_A: Rank 2] ──► Reciprocal Rank Fusion (RRF)
+                                                                    │
+                                                                    ▼
+                                                             Final: [doc_A, doc_C, doc_B]
+```
+
+### Cross-Encoder Reranking
+Embedding models are **Bi-Encoders**—they embed the query and documents independently, losing fine-grained contextual interactions. 
+
+A **Reranker (Cross-Encoder)** takes the query and a retrieved chunk together and runs them through a unified attention layer. This calculates a highly accurate similarity score based on the direct grammatical relationship between the query and context.
+
+```
+User Query ──┐
+             ├──► Cross-Encoder Model ──► Semantic Relevance Score (0.0 to 1.0)
+Doc Chunk  ──┘
+```
+
+Because Cross-Encoders are computationally expensive, we use a two-stage retrieval pipeline:
+1. Retrieve the top 20 candidate chunks using fast Hybrid Search (Stage 1).
+2. Rerank those 20 candidates down to the top 5 chunks using a Cross-Encoder (Stage 2).
+
+---
+
+## 5. The Generation Phase: Proven Prompt Grounding Patterns
+
+Once we have retrieved the top relevant chunks, we must format them into a highly resilient prompt context that prevents the LLM from hallucinating or ignoring instructions.
+
+### Production Grounding Prompt Template
 
 ```python
-from openai import OpenAI
-import chromadb
+GROUNDING_PROMPT = """
+You are a highly analytical technical support assistant. Your task is to resolve the user query using ONLY the provided verified context.
 
-client = OpenAI()
-chroma = chromadb.Client()
+STRICT OPERATIONAL DIRECTIVES:
+1. Ground your answer entirely in the facts provided under the "VERIFIED CONTEXT" section.
+2. If the answer cannot be confidently derived from the provided context, state: "I don't have enough verified information to answer this question." Do not attempt to synthesize outside knowledge.
+3. For every claim or step you describe, append an in-text citation linking back to its source document ID (e.g., [doc_2]).
+4. Keep your formatting technical, clean, and concise.
 
-def build_index(documents: list[str], collection_name: str):
-    """Index documents into ChromaDB"""
-    collection = chroma.create_collection(collection_name)
+VERIFIED CONTEXT:
+$context_data
 
-    embeddings = [
-        client.embeddings.create(
-            model="text-embedding-3-small",
-            input=doc
-        ).data[0].embedding
-        for doc in documents
-    ]
+USER QUERY:
+$user_query
 
-    collection.add(
-        documents=documents,
-        embeddings=embeddings,
-        ids=[f"doc_{i}" for i in range(len(documents))]
-    )
-    return collection
-
-def retrieve(collection, query: str, k: int = 3) -> list[str]:
-    """Find most relevant chunks for a query"""
-    query_embedding = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=query
-    ).data[0].embedding
-
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=k
-    )
-    return results["documents"][0]
-
-def generate_answer(query: str, context_chunks: list[str]) -> str:
-    """Generate answer using retrieved context"""
-    context = "\n\n---\n\n".join(context_chunks)
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": "Answer questions using ONLY the provided context. If the answer isn't in the context, say 'I don't know.'"
-            },
-            {
-                "role": "user",
-                "content": f"Context:\n{context}\n\nQuestion: {query}"
-            }
-        ]
-    )
-    return response.choices[0].message.content
+Provide your grounded, cited response below:
+"""
 ```
 
 ---
 
-## 5. PDF Chatbot
+## 6. RAG Evaluation: Faithfulness, Relevance, and Recall
 
-**Complete working example:**
+To verify the quality of your RAG pipeline, you must move beyond subjective manual testing. The **RAGAS** framework provides a quantitative methodology to evaluate RAG components:
 
-```python
-from pypdf import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-import chromadb
-from openai import OpenAI
-import os
-
-client = OpenAI()
-chroma_client = chromadb.Client()
-
-def load_pdf(path: str) -> str:
-    reader = PdfReader(path)
-    return "\n".join(page.extract_text() for page in reader.pages)
-
-def build_pdf_index(pdf_path: str) -> chromadb.Collection:
-    # 1. Load PDF
-    text = load_pdf(pdf_path)
-
-    # 2. Chunk
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    chunks = splitter.split_text(text)
-    print(f"Loaded {len(chunks)} chunks from PDF")
-
-    # 3. Embed & store
-    collection = chroma_client.create_collection("pdf_docs")
-    collection.add(
-        documents=chunks,
-        ids=[f"chunk_{i}" for i in range(len(chunks))]
-    )
-    return collection
-
-def chat_with_pdf(collection: chromadb.Collection, question: str) -> str:
-    # 4. Retrieve
-    results = collection.query(query_texts=[question], n_results=3)
-    context = "\n\n".join(results["documents"][0])
-
-    # 5. Generate
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Answer based only on the provided context. Be concise."},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
-        ]
-    )
-    return response.choices[0].message.content
-
-# --- Main ---
-collection = build_pdf_index("company_policy.pdf")
-
-print("PDF loaded! Ask questions (type 'quit' to exit)\n")
-while True:
-    q = input("You: ").strip()
-    if q.lower() == "quit":
-        break
-    print(f"AI: {chat_with_pdf(collection, q)}\n")
 ```
+            ┌──────────────────────────────────────────────┐
+            │               RAGAS EVALUATION               │
+            ├──────────────────────┬───────────────────────┤
+            │ Ingestion/Retrieval  │ Generation Quality    │
+            │ • Context Recall     │ • Faithfulness        │
+            │                      │ • Answer Relevance    │
+            └──────────────────────┴───────────────────────┘
+```
+
+* **Faithfulness (Hallucination Metric):** Evaluates if the generated answer is derived *only* from the retrieved context. An LLM parses the generated answer into individual statements, and then checks if each statement is explicitly backed by the retrieved context chunks.
+* **Answer Relevance:** Evaluates if the generated answer directly addresses the user's question. This is calculated by prompting an LLM to generate hypothetical questions from the generated answer, and then computing the vector cosine similarity between those generated questions and the user's actual query.
+* **Context Recall:** Evaluates if the retrieval engine fetched all the necessary facts required to answer the question. This compares the retrieved chunks against a human-verified ground-truth answer.
 
 ---
 
-## 6. Advanced: Hybrid Search
+## 🔨 Hands-On Production Labs
 
-Combine **semantic search** (embeddings) with **keyword search** for better results:
+In this module's labs, you will build and run a production-grade RAG pipeline:
 
-```python
-# Semantic: finds similar meaning even with different words
-# Keyword: finds exact terms, great for proper nouns, codes, IDs
-
-# ChromaDB supports metadata filtering
-results = collection.query(
-    query_texts=["refund policy"],
-    n_results=5,
-    where={"department": "finance"}  # filter by metadata
-)
-```
+1. **The PDF Semantic Database Loader:** Parse technical PDFs, split the text using a recursive character splitter with dynamic page markers, generate embeddings using the OpenAI API, and store them in a local ChromaDB collection.
+2. **Developing the Fully Grounded PDF Chatbot:** Build a stateful, interactive terminal application that retrieves relevant PDF chunks, formats them into a strict grounding prompt, and stream-renders responses with verified document citations.
+3. **Implementing the Reranking Engine:** Integrate a local reranker (such as the Hugging Face `cohere-rerank` or `bge-reranker` models) into the retrieval loop to benchmark retrieval precision before and after reranking.
 
 ---
 
-## 📝 MCQs → [mcqs.md](./mcqs.md)
-## 💻 Assignment → [assignments.md](./assignments.md) | 🏆 Mini Project 01: PDF Chatbot
+## 📝 MCQ Verification → [mcqs.md](./mcqs.md)
+* Consolidate your understanding of document loading, splitting, vector indices, distance metrics, and RAG evaluation with 10 conceptual check questions.
+
+## 💻 Coding Assignment → [assignments.md](./assignments.md) | 🏆 Mini Project 01: PDF Chatbot
+* **Objective:** Complete your first major graded project: the **Enterprise PDF Chatbot**. You must write a production-grade Python app that takes any uploaded technical PDF, processes it through a recursive character chunker, indexes it into a persistent ChromaDB database, performs hybrid retrieval with custom metadata filtering, and streams a grounded, cited response back to the user interface.

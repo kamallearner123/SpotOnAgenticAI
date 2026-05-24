@@ -6,7 +6,7 @@
 
 - A) OpenAI
 - B) Google
-- C) Anthropic ✅
+- C) Anthropic
 - D) Meta
 
 ---
@@ -14,7 +14,7 @@
 **Q2.** The best analogy for MCP is:
 
 - A) HDMI — a video/audio connector
-- B) USB — a universal connector between devices ✅
+- B) USB — a universal connector between devices
 - C) Bluetooth — a wireless protocol
 - D) HTTPS — a secure communication protocol
 
@@ -23,7 +23,7 @@
 **Q3.** In MCP, a "Resource" refers to:
 
 - A) A GPU computation unit
-- B) A data source the AI can read (like a file or database) ✅
+- B) A data source the AI can read (like a file or database)
 - C) A tool the AI can call
 - D) The AI model itself
 
@@ -33,7 +33,7 @@
 
 - A) Allow read/write access to all files
 - B) Run file operations as administrator
-- C) Whitelist specific directories and sanitize all paths ✅
+- C) Whitelist specific directories and sanitize all paths
 - D) Disable error handling for speed
 
 ---
@@ -42,7 +42,7 @@
 
 - A) `@modelcontextprotocol/server-filesystem`
 - B) `@modelcontextprotocol/server-github`
-- C) `@modelcontextprotocol/server-openai` ✅
+- C) `@modelcontextprotocol/server-openai`
 - D) `@modelcontextprotocol/server-postgres`
 
 ---
@@ -51,7 +51,7 @@
 
 - A) Immediately terminate the session
 - B) Ignore the error and continue
-- C) Receive the error as an observation and decide how to handle it ✅
+- C) Receive the error as an observation and decide how to handle it
 - D) Restart the entire conversation
 
 ---
@@ -60,7 +60,7 @@
 
 - A) MCP tools are always free
 - B) MCP only works with Claude
-- C) MCP provides a standard protocol so any tool works with any AI ✅
+- C) MCP provides a standard protocol so any tool works with any AI
 - D) MCP is faster than REST APIs
 
 ---
@@ -68,10 +68,25 @@
 **Q8.** When building an AI tool that executes shell commands, `timeout=10` in `subprocess.run()` ensures:
 
 - A) The command runs at least 10 seconds
-- B) Commands that take longer than 10 seconds are terminated ✅
+- B) Commands that take longer than 10 seconds are terminated
 - C) Only 10 commands can run per session
 - D) The output is limited to 10 lines
 
 ---
 
 **Score:** ___/8
+
+---
+
+## Answer Key
+
+| Question | Correct Answer |
+| :---: | :---: |
+| **Q1** | C |
+| **Q2** | B |
+| **Q3** | B |
+| **Q4** | C |
+| **Q5** | C |
+| **Q6** | C |
+| **Q7** | C |
+| **Q8** | B |
